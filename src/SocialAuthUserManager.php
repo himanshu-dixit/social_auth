@@ -158,7 +158,8 @@ class SocialAuthUserManager {
 
     $drupal_user_id = $this->checkIfUserExists('facebook','1523605467710951');
     // Tries to load the user by their email.
-    $drupal_user = $this->loadUserByProperty('mail', $email);
+
+    //$drupal_user = $this->loadUserByProperty('uid', 1);
 
 
     // If user email has already an account in the site.
@@ -290,8 +291,7 @@ class SocialAuthUserManager {
    *   Else return Drupal User Id associate with the account.
    */
 
-  public function checkIfUserExists($type,$social_media_id)
-  {
+  public function checkIfUserExists($type,$social_media_id) {
     $storage = \Drupal::entityManager()->getStorage('social_auth');
     // Perform query on social auth entity.
     $query = \Drupal::entityQuery('social_auth');
@@ -313,6 +313,45 @@ class SocialAuthUserManager {
   }
 
   /**
+   * Add user record in Social Auth Entity.
+   *
+   * @param integer $user_id
+   *   Drupal User ID.
+   * @param string $type
+   *   Type of social network.
+   * @param string $social_media_id
+   *   Unique Social ID returned by social network
+   *
+   * @return True
+   *   if User record was created or
+   *   False otherwise
+   */
+  public function addUserRecord($user_id,$type,$social_media_id) {
+    // Make sure we have everything we need.
+    if (!$user_id || !$type || !$social_media_id) {
+      $this->loggerFactory
+        ->get($this->getPluginId())
+        ->error('Failed to add user record in social_auth entiy. User_id: @user_id, social_network_identifier: @social_network_identifier, social_media_id: @social_media_id',
+          array('@user_id' => $user_id, '@social_network_identifier' => $type, '@social_media_id' => $social_media_id));
+      return FALSE;
+    }
+    else{
+      // Add user record.
+      $user_info= SocialAuth::create([
+        // Required Fields
+        'user_id' => $user_id,
+        'type' => $type,
+        'social_media_id' => $social_media_id
+      ]);
+
+      //Saving the non-permanent record.
+      $user_info->save();
+      return TRUE;
+    }
+
+  }
+
+    /**
    * Create a new user account.
    *
    * @param string $name
