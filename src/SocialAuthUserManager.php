@@ -155,8 +155,12 @@ class SocialAuthUserManager {
    *   A redirect response.
    */
   public function authenticateUser($email, $name, $id = NULL, $picture_url = FALSE) {
+
+    $drupal_user_id = $this->checkIfUserExists('facebook','1523605467710951');
     // Tries to load the user by their email.
     $drupal_user = $this->loadUserByProperty('mail', $email);
+
+
     // If user email has already an account in the site.
     if ($drupal_user) {
       // Authenticates and redirect existing user.
@@ -272,6 +276,40 @@ class SocialAuthUserManager {
 
     // If user was not found, return FALSE.
     return FALSE;
+  }
+
+  /**
+   * Checks if user exist in entity.
+   *
+   * @param string $social_media_id
+   *   User's name on Provider.
+   * @param string $type
+   *   User's email address.
+   *
+   * @return false if user doesn't exist
+   *   Else return Drupal User Id associate with the account.
+   */
+
+  public function checkIfUserExists($type,$social_media_id)
+  {
+    $storage = \Drupal::entityManager()->getStorage('social_auth');
+    // Perform query on social auth entity.
+    $query = \Drupal::entityQuery('social_auth');
+
+    // Check If user exist by using type and social_media_id.
+    $social_auth_user = $query->condition('type', $type)
+      ->condition('social_media_id', $social_media_id)
+      ->execute();
+
+    $user_data = $storage->load(reset($social_auth_user));
+
+    if(!$social_auth_user) {
+      return FALSE;
+    }
+    else{
+      // Return User ID.
+      return $user_data->get('user_id')->getValue()[0]['value'];
+    }
   }
 
   /**
@@ -548,8 +586,8 @@ class SocialAuthUserManager {
    */
   protected function getNewUserStatus() {
     if ($this->configFactory
-      ->get('user.settings')
-      ->get('register') == 'visitors') {
+        ->get('user.settings')
+        ->get('register') == 'visitors') {
       return 1;
     }
 
