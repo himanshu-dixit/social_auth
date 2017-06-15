@@ -142,24 +142,26 @@ class SocialAuthUserManager {
   /**
    * Creates and/or authenticates an user.
    *
-   * @param string $email
-   *   The user's email address.
    * @param string $name
-   *   The user's name.
-   * @param string $id
-   *   The user's id in provider.
+   * The user's name.
+   * @param string $email
+   * The user's email address.
+   * @param string $type
+   * The social implementer identifier.
+   * @param string $social_media_id
+   * The unique id returned by the user.
    * @param string|bool $picture_url
-   *   The user's picture.
+   * The user's picture.
    *
    * @return \Symfony\Component\HttpFoundation\RedirectResponse
-   *   A redirect response.
+   * A redirect response.
    */
-  public function authenticateUser($email, $name, $id = NULL, $picture_url = FALSE) {
+  public function authenticateUser($name, $email, $type, $social_media_id, $picture_url = FALSE) {
 
-    $drupal_user_id = $this->checkIfUserExists('facebook','1523605467710951');
+    $drupal_user_id = $this->checkIfUserExists($type,$social_media_id);
     // Tries to load the user by their email.
 
-    //$drupal_user = $this->loadUserByProperty('uid', 1);
+    $drupal_user = $this->loadUserByProperty('uid', $drupal_user_id);
 
 
     // If user email has already an account in the site.
@@ -168,15 +170,20 @@ class SocialAuthUserManager {
       return $this->authenticateExistingUser($drupal_user);
     }
 
-    $drupal_user = $this->createUser($name, $email);
+    $drupal_new_user = $this->createUser($name, $email);
     // If the new user could be registered.
-    if ($drupal_user) {
+    if ($drupal_new_user) {
+      //Add this to social auth table.
+
+      $this->addUserRecord($drupal_new_user->id(),$type,$social_media_id);
+
+
       // Download profile picture for the newly created user.
       if ($picture_url) {
-        $this->setProfilePic($drupal_user, $picture_url, $id);
+        $this->setProfilePic($drupal_new_user, $picture_url, $id);
       }
       // Authenticates and redirect new user.
-      return $this->authenticateNewUser($drupal_user);
+      return $this->authenticateNewUser($drupal_new_user);
     }
 
     drupal_set_message($this->t('You could not be authenticated, please contact the administrator'), 'error');
@@ -365,10 +372,10 @@ class SocialAuthUserManager {
    */
   public function createUser($name, $email) {
     // Make sure we have everything we need.
-    if (!$name || !$email) {
+    if (!$name) {
       $this->loggerFactory
         ->get($this->getPluginId())
-        ->error('Failed to create user. Name: @name, email: @email', array('@name' => $name, '@email' => $email));
+        ->error('Failed to create user. Name: @name', array('@name' => $name));
       return FALSE;
     }
 
@@ -824,17 +831,34 @@ class SocialAuthUserManager {
    *   Fields to initialize for the user creation.
    */
   protected function getUserFields($name, $email, $langcode) {
-    // - Password can be very long since the user doesn't see this.
-    $fields = [
-      'name' => $this->generateUniqueUsername($name),
-      'mail' => $email,
-      'init' => $email,
-      'pass' => $this->userPassword(32),
-      'status' => $this->getNewUserStatus(),
-      'langcode' => $langcode,
-      'preferred_langcode' => $langcode,
-      'preferred_admin_langcode' => $langcode,
-    ];
+    if($email) {
+      //Field when social auth implemeter passes email address of user.
+      $fields = [
+        'name' => $this->generateUniqueUsername($name),
+        'mail' => $email,
+        'init' => $email,
+        'pass' => $this->userPassword(32),
+        'status' => $this->getNewUserStatus(),
+        'langcode' => $langcode,
+        'preferred_langcode' => $langcode,
+        'preferred_admin_langcode' => $langcode,
+      ];
+    }
+    else{
+      //Field to create user account without email address.
+      $fields = [
+        'name' => $this->generateUniqueUsername($name),
+        'pass' => $this->userPassword(32),
+        'status' => $this->getNewUserStatus(),
+        'langcode' => $langcode,
+        'preferred_langcode' => $langcode,
+        'preferred_admin_langcode' => $langcode,
+      ];
+    }
+
+    //if there is no email generate another field
+
+
 
     // Dispatches SocialAuthEvents::USER_FIELDS, so that other modules can
     // update this array before an user is saved.
